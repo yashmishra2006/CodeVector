@@ -754,46 +754,56 @@
     }
 
     // -----------------------------------------------------------------------
-    // IntersectionObservers for both directions
+    // Dynamic Scroll-Velocity Preloading
     // -----------------------------------------------------------------------
-    const bottomObserver = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !isLoading && hasMoreForward) {
+    let lastScrollY = window.scrollY;
+    let lastScrollTime = Date.now();
+    let scrollVelocity = 0; // pixels per millisecond
+
+    window.addEventListener("scroll", () => {
+      const currentY = window.scrollY;
+      const currentTime = Date.now();
+      const dt = currentTime - lastScrollTime;
+
+      // Calculate instantaneous scroll velocity (px / ms)
+      if (dt > 0) {
+        scrollVelocity = (currentY - lastScrollY) / dt;
+      }
+      lastScrollY = currentY;
+      lastScrollTime = currentTime;
+
+      // Base threshold is 1000px (~25 items). 
+      // We multiply velocity by an assumed 800ms network/render latency to get dynamic buffer.
+      // If scrolling down at 5px/ms (very fast), we add 4000px to the threshold.
+      const dynamicThreshold = 1000 + (Math.abs(scrollVelocity) * 800);
+
+      // Check distance to bottom for forward loading
+      if (scrollVelocity > 0 && !isLoading && hasMoreForward) {
+        const distanceToBottom = document.documentElement.scrollHeight - (window.innerHeight + window.scrollY);
+        if (distanceToBottom < dynamicThreshold) {
           loadForward();
         }
-      },
-      { rootMargin: "0px 0px 4000px 0px" }
-    );
+      }
 
-    const topObserver = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !isLoading && hasMoreBackward && !isAtTop) {
+      // Check distance to top for backward loading
+      if (scrollVelocity < 0 && !isLoading && hasMoreBackward && !isAtTop) {
+        const distanceToTop = window.scrollY;
+        if (distanceToTop < dynamicThreshold) {
           loadBackward();
         }
-      },
-      { rootMargin: "4000px 0px 0px 0px" }
-    );
+      }
+    }, { passive: true });
 
-    bottomObserver.observe(bottomSentinel);
-    topObserver.observe(topSentinel);
-
-    // Check if sentinels are visible and trigger loads if so.
-    // This handles the case where IntersectionObserver doesn't re-fire
-    // because the sentinel never left the viewport between loads.
-    function isSentinelVisible(el) {
-      const rect = el.getBoundingClientRect();
-      return rect.top < window.innerHeight + 4000 && rect.bottom > -4000;
-    }
-
+    // Fallback: Check occasionally in case scroll event stops firing before fetch completes
     function scheduleCheck() {
       setTimeout(() => {
-        if (!isLoading && hasMoreForward && isSentinelVisible(bottomSentinel)) {
-          loadForward();
-        }
-        if (!isLoading && hasMoreBackward && !isAtTop && isSentinelVisible(topSentinel)) {
-          loadBackward();
-        }
-      }, 100);
+        if (isLoading) return;
+        const distanceToBottom = document.documentElement.scrollHeight - (window.innerHeight + window.scrollY);
+        const distanceToTop = window.scrollY;
+        
+        if (hasMoreForward && distanceToBottom < 1000) loadForward();
+        else if (hasMoreBackward && !isAtTop && distanceToTop < 1000) loadBackward();
+      }, 150);
     }
 
     // -----------------------------------------------------------------------
@@ -817,7 +827,7 @@
       await new Promise((r) => setTimeout(r, 100));
       grid.innerHTML = "";
 
-      aitrward();
+      await loadForward();
     }
 
     categoryFilter.addEventListener("change", () => {

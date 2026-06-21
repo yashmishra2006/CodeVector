@@ -177,13 +177,27 @@ Health check for Coolify's monitoring.
 
 ## Bonus: Sliding Window UI
 
-The frontend implements **bidirectional infinite scroll** with DOM pruning:
+The frontend implements **bidirectional infinite scroll** with DOM pruning to keep memory low, and features a velocity-aware preloading mechanism.
 
-- **Max 5 pages (100 items)** in the DOM at any time
-- Two `IntersectionObserver` sentinels: one at the bottom (triggers forward loading), one at the top (triggers backward loading)
-- When the window exceeds 5 pages, the oldest page is removed from the opposite end
-- Scroll position is preserved during pruning using `scrollHeight` delta adjustment
-- This means a user can scroll through all 200,000 products without the browser accumulating 200K DOM nodes
+**The Evolution of the Infinite Scroll Implementation**:
+
+1. **Approach 1: `IntersectionObserver` with small root margin**
+   - *Initial try*: Triggered a fetch when a DOM sentinel entered the viewport.
+   - *The issue*: Fast scrollers easily outpaced the network. If the user scrolled rapidly, they hit the bottom and saw a white space / loading spinner because the fetch didn't start early enough.
+
+2. **Approach 2: `IntersectionObserver` with massive root margin**
+   - *Second try*: Increased `rootMargin` to `4000px` to trigger preloading long before the user hit the bottom.
+   - *The issue*: While it masked the network latency, it was rigid and didn't account for actual user behavior. It also loaded data aggressively even if the user was scrolling slowly.
+
+3. **Approach 3: Dynamic Scroll-Velocity Loading (Current)**
+   - *Final implementation*: Replaced the static observer with a `scroll` event listener that calculates instantaneous scroll velocity (pixels per millisecond).
+   - *How it works*: It multiplies the velocity by expected network latency (e.g., 800ms) to calculate a dynamic `distanceToBottom` threshold. If the user scrolls at 5px/ms, the threshold expands to 4000px+, triggering the load instantly. If they scroll slowly, it triggers at a conservative 1000px limit.
+   - *Result*: Zero white space for fast scrollers, and efficient network usage for slow scrollers.
+
+**DOM Windowing**:
+- The grid keeps a maximum of **3 pages (600 items)** in the DOM at any time.
+- When the window exceeds this limit, the oldest page is removed from the opposite end.
+- Scroll position is preserved during pruning using `scrollHeight` delta adjustment, so the user never experiences visual jumps.
 
 ---
 
