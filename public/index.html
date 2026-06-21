@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Browse 200,000+ products with lightning-fast cursor-based pagination" />
-  <title>CodeVeda - Product Browser</title>
+  <title>CodeVector — Product Browser</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -420,7 +420,7 @@
       <div class="logo">
         <div class="logo-icon">CV</div>
         <div>
-          <h1>CodeVeda</h1>
+          <h1>CodeVector</h1>
           <span>Product Browser</span>
         </div>
       </div>
@@ -703,6 +703,9 @@
         bottomStatus.innerHTML = `<p class="end-message">Error loading products</p>`;
       } finally {
         isLoading = false;
+        // If sentinel is still visible after load, trigger again
+        // (IntersectionObserver only fires on transitions, not while staying visible)
+        scheduleCheck();
       }
     }
 
@@ -746,6 +749,7 @@
         topStatus.style.display = "none";
       } finally {
         isLoading = false;
+        scheduleCheck();
       }
     }
 
@@ -772,6 +776,25 @@
 
     bottomObserver.observe(bottomSentinel);
     topObserver.observe(topSentinel);
+
+    // Check if sentinels are visible and trigger loads if so.
+    // This handles the case where IntersectionObserver doesn't re-fire
+    // because the sentinel never left the viewport between loads.
+    function isSentinelVisible(el) {
+      const rect = el.getBoundingClientRect();
+      return rect.top < window.innerHeight + 300 && rect.bottom > -300;
+    }
+
+    function scheduleCheck() {
+      setTimeout(() => {
+        if (!isLoading && hasMoreForward && isSentinelVisible(bottomSentinel)) {
+          loadForward();
+        }
+        if (!isLoading && hasMoreBackward && !isAtTop && isSentinelVisible(topSentinel)) {
+          loadBackward();
+        }
+      }, 100);
+    }
 
     // -----------------------------------------------------------------------
     // Initial load & category filter
