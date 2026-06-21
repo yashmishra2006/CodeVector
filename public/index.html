@@ -555,9 +555,7 @@
     }
 
     function makeCursor(item) {
-      return Buffer.from
-        ? btoa(JSON.stringify({ created_at: item.created_at, id: item.id }))
-        : btoa(JSON.stringify({ created_at: item.created_at, id: item.id }));
+      return btoa(JSON.stringify({ created_at: item.created_at, id: item.id }));
     }
 
     function renderSkeletons() {
