@@ -4,7 +4,8 @@
 
 A product browsing API serving **200,000 products** with **cursor-based (keyset) pagination**, category filtering, and a bonus UI with bidirectional infinite scroll.
 
-**Live URL**: *(add your Coolify URL here)*  
+**Live URL**: *https://codevector.yashmishra.in*  
+**Github Repository** : *https://github.com/yashmishra2006/CodeVector*
 **Stack**: Node.js (Express) + PostgreSQL 18 + Docker (Coolify)
 
 ---
