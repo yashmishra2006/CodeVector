@@ -1,4 +1,4 @@
-# CodeVector Take-Home — Submission Notes
+# CodeVector Take-Home - Submission Notes
 
 ## What I Built
 
@@ -32,14 +32,14 @@ SELECT * FROM products ORDER BY created_at DESC LIMIT 20 OFFSET 20;
 -- Result: 5 DUPLICATES. Items 21–25 are MISSED entirely.
 ```
 
-`OFFSET` counts rows from the beginning every time. When rows are inserted above the offset point, everything below shifts — duplicates appear and items are skipped.
+`OFFSET` counts rows from the beginning every time. When rows are inserted above the offset point, everything below shifts - duplicates appear and items are skipped.
 
 ### Why Cursor-Based Pagination Works
 
 Instead of counting rows, we anchor to the **last item the user actually saw**:
 
 ```sql
--- Page 1 (no cursor — first page)
+-- Page 1 (no cursor - first page)
 SELECT * FROM products
 ORDER BY created_at DESC, id DESC
 LIMIT 20;
@@ -53,10 +53,10 @@ ORDER BY created_at DESC, id DESC
 LIMIT 20;
 ```
 
-New inserts have `created_at` values **newer** than the cursor — they sort *above* it and never affect results below. The user's position in the dataset is anchored to an immutable point, not a row count.
+New inserts have `created_at` values **newer** than the cursor - they sort *above* it and never affect results below. The user's position in the dataset is anchored to an immutable point, not a row count.
 
 **Why `(created_at, id)` and not just `created_at`?**  
-Multiple products can share the same `created_at` timestamp. Adding `id` (UUID, unique) as a tiebreaker creates a **total ordering** — no two products have the same `(created_at, id)` pair, so no items can be accidentally skipped or duplicated.
+Multiple products can share the same `created_at` timestamp. Adding `id` (UUID, unique) as a tiebreaker creates a **total ordering** - no two products have the same `(created_at, id)` pair, so no items can be accidentally skipped or duplicated.
 
 ---
 
@@ -75,7 +75,7 @@ CREATE TABLE products (
 );
 ```
 
-### Indexes — and Why They Matter
+### Indexes - and Why They Matter
 
 ```sql
 -- Index 1: Powers unfiltered browsing
@@ -87,9 +87,9 @@ CREATE INDEX idx_products_category_cursor
   ON products (category, created_at DESC, id DESC);
 ```
 
-**Index 1** ensures that `ORDER BY created_at DESC, id DESC` + `WHERE (created_at, id) < (cursor)` is serviced by a **B-tree range scan** — the database walks the index from the cursor position and reads exactly `LIMIT` entries. No sorting, no sequential scan. This is O(log n + page_size), constant regardless of how deep into the dataset the user has scrolled.
+**Index 1** ensures that `ORDER BY created_at DESC, id DESC` + `WHERE (created_at, id) < (cursor)` is serviced by a **B-tree range scan** - the database walks the index from the cursor position and reads exactly `LIMIT` entries. No sorting, no sequential scan. This is O(log n + page_size), constant regardless of how deep into the dataset the user has scrolled.
 
-**Index 2** is a **covering composite index** for category queries. PostgreSQL uses the `category` prefix to filter, then walks the remaining `(created_at DESC, id DESC)` portion for ordering and cursor comparison — all within a single index scan.
+**Index 2** is a **covering composite index** for category queries. PostgreSQL uses the `category` prefix to filter, then walks the remaining `(created_at DESC, id DESC)` portion for ordering and cursor comparison - all within a single index scan.
 
 Without these indexes, the query would require a full table scan + sort, which degrades as OFFSET grows. With them, page 1 and page 10,000 are equally fast.
 
@@ -117,7 +117,7 @@ for (let i = 0; i < 200000; i++) {
 // 200,000 round trips × ~1ms each = ~200 seconds
 ```
 
-**My approach** — batched multi-row INSERT:
+**My approach** - batched multi-row INSERT:
 ```js
 const BATCH_SIZE = 5000; // 40 batches total
 
@@ -132,7 +132,7 @@ for (let i = 0; i < BATCH_SIZE; i++) {
 await pool.query(`INSERT INTO products (name, category, price, created_at) VALUES ${values.join(",")}`, params);
 ```
 
-**Result**: 200,000 rows inserted in **~3-5 seconds** (40 batches × 5,000 rows). Each batch is a single SQL statement with parameterized values — safe, fast, and doesn't hit PostgreSQL's parameter limit.
+**Result**: 200,000 rows inserted in **~3-5 seconds** (40 batches × 5,000 rows). Each batch is a single SQL statement with parameterized values - safe, fast, and doesn't hit PostgreSQL's parameter limit.
 
 ---
 
@@ -161,9 +161,9 @@ await pool.query(`INSERT INTO products (name, category, price, created_at) VALUE
 }
 ```
 
-**How the cursor works**: The cursor is a Base64-encoded JSON object containing `{created_at, id}` of the edge item. The client doesn't need to understand its structure — it's opaque. The server decodes it and uses it in the `WHERE` clause.
+**How the cursor works**: The cursor is a Base64-encoded JSON object containing `{created_at, id}` of the edge item. The client doesn't need to understand its structure - it's opaque. The server decodes it and uses it in the `WHERE` clause.
 
-**Bidirectional pagination**: The `direction` parameter supports a sliding-window UI. `forward` fetches items older than the cursor (scrolling down). `backward` fetches items newer than the cursor (scrolling back up). Backward queries use `>` comparison with `ASC` ordering, then reverse results before returning — so the response always arrives in consistent `DESC` display order.
+**Bidirectional pagination**: The `direction` parameter supports a sliding-window UI. `forward` fetches items older than the cursor (scrolling down). `backward` fetches items newer than the cursor (scrolling back up). Backward queries use `>` comparison with `ASC` ordering, then reverse results before returning - so the response always arrives in consistent `DESC` display order.
 
 ### `GET /api/categories`
 
@@ -189,19 +189,19 @@ The frontend implements **bidirectional infinite scroll** with DOM pruning:
 
 ## What I'd Improve With More Time
 
-1. **Rate limiting and input validation** — Add `express-rate-limit` to prevent abuse, validate and sanitize query parameters more rigorously.
+1. **Rate limiting and input validation** - Add `express-rate-limit` to prevent abuse, validate and sanitize query parameters more rigorously.
 
-2. **Response compression** — Add `compression` middleware. JSON responses for 20 products are ~3KB, but compression would cut that in half for mobile users.
+2. **Response compression** - Add `compression` middleware. JSON responses for 20 products are ~3KB, but compression would cut that in half for mobile users.
 
-3. **Database connection pooling tuning** — Currently using `pg` pool defaults. In production, I'd monitor connection usage and tune `max`, `idleTimeoutMillis` based on actual traffic patterns.
+3. **Database connection pooling tuning** - Currently using `pg` pool defaults. In production, I'd monitor connection usage and tune `max`, `idleTimeoutMillis` based on actual traffic patterns.
 
-4. **Search** — Add a `search` query parameter using PostgreSQL's `ts_vector` full-text search or `ILIKE` with a GIN/trigram index for product name search.
+4. **Search** - Add a `search` query parameter using PostgreSQL's `ts_vector` full-text search or `ILIKE` with a GIN/trigram index for product name search.
 
-5. **Caching** — For the categories endpoint and total count, add a short TTL cache (Redis or in-memory) since these change infrequently.
+5. **Caching** - For the categories endpoint and total count, add a short TTL cache (Redis or in-memory) since these change infrequently.
 
-6. **Automated tests** — A test that fetches all pages sequentially, collects all IDs, and asserts zero duplicates and zero gaps. Plus a test that inserts products mid-pagination and verifies stability.
+6. **Automated tests** - A test that fetches all pages sequentially, collects all IDs, and asserts zero duplicates and zero gaps. Plus a test that inserts products mid-pagination and verifies stability.
 
-7. **Monitoring & observability** — Request logging with response times, `EXPLAIN ANALYZE` output for slow queries, health check that verifies DB connectivity.
+7. **Monitoring & observability** - Request logging with response times, `EXPLAIN ANALYZE` output for slow queries, health check that verifies DB connectivity.
 
 ---
 
@@ -214,8 +214,8 @@ The frontend implements **bidirectional infinite scroll** with DOM pruning:
 - Drafting documentation
 
 **What I caught and fixed**:
-- **`Buffer` in the browser**: AI used `Buffer.from()` in the frontend JavaScript for Base64 encoding. `Buffer` is a Node.js API — it doesn't exist in browsers. Fixed to use the browser-native `btoa()`. This is a classic mistake when writing both server and client JS in the same project.
-- **SSL assumption**: AI defaulted to `ssl: { rejectUnauthorized: false }` for production PostgreSQL. On Coolify, the app and database are on the same internal Docker network — SSL isn't supported or needed. Changed to `ssl: false`.
+- **`Buffer` in the browser**: AI used `Buffer.from()` in the frontend JavaScript for Base64 encoding. `Buffer` is a Node.js API - it doesn't exist in browsers. Fixed to use the browser-native `btoa()`. This is a classic mistake when writing both server and client JS in the same project.
+- **SSL assumption**: AI defaulted to `ssl: { rejectUnauthorized: false }` for production PostgreSQL. On Coolify, the app and database are on the same internal Docker network - SSL isn't supported or needed. Changed to `ssl: false`.
 - **IntersectionObserver stalling**: AI's initial infinite scroll used `IntersectionObserver` alone, which only fires on enter/leave transitions. If the sentinel stays visible after a page load (not enough content to push it off-screen), subsequent pages never load. Added a `scheduleCheck()` fallback that manually checks sentinel visibility after each load.
 
 **Key design decisions I made independently**:
