@@ -1,10 +1,10 @@
-# CodeVeda — Product Browser
+# CodeVeda - Product Browser
 
 A backend API for browsing ~200,000 products with **cursor-based pagination** that guarantees no duplicates or missed items, even when data changes during browsing.
 
 ## Why Cursor-Based Pagination?
 
-Traditional `OFFSET/LIMIT` pagination breaks when rows are inserted or deleted between page fetches — items shift positions, causing duplicates or gaps. **Cursor pagination** uses the last seen `(created_at, id)` tuple as a stable anchor point. New inserts above the cursor don't affect subsequent pages.
+Traditional `OFFSET/LIMIT` pagination breaks when rows are inserted or deleted between page fetches - items shift positions, causing duplicates or gaps. **Cursor pagination** uses the last seen `(created_at, id)` tuple as a stable anchor point. New inserts above the cursor don't affect subsequent pages.
 
 ```
 Page 1:  ORDER BY created_at DESC, id DESC LIMIT 20           → returns items 1–20

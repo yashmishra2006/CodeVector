@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// seed.js — Generates 200,000 products using batched multi-row INSERTs.
+// seed.js - Generates 200,000 products using batched multi-row INSERTs.
 //
 // Why this approach?
-//   - Single-row INSERT in a loop would mean 200,000 round trips — very slow.
+//   - Single-row INSERT in a loop would mean 200,000 round trips - very slow.
 //   - We batch 5,000 rows per INSERT statement (40 batches total).
 //   - Each batch builds a parameterized VALUES list: ($1,$2,$3,$4,$5,$6), ...
 //   - This is dramatically faster: ~2-5 seconds vs. minutes.
@@ -14,7 +14,7 @@ require("dotenv").config();
 const { Pool } = require("pg");
 
 const TOTAL_PRODUCTS = 200_000;
-const BATCH_SIZE = 5_000; // rows per INSERT — sweet spot for parameterized queries
+const BATCH_SIZE = 5_000; // rows per INSERT - sweet spot for parameterized queries
 
 // Realistic product categories
 const CATEGORIES = [
@@ -120,7 +120,7 @@ async function seed() {
 
     const progress = (((batch + 1) / totalBatches) * 100).toFixed(0);
     console.log(
-      `  Batch ${batch + 1}/${totalBatches} (${progress}%) — ${rowsInBatch.toLocaleString()} rows`
+      `  Batch ${batch + 1}/${totalBatches} (${progress}%) - ${rowsInBatch.toLocaleString()} rows`
     );
   }
 

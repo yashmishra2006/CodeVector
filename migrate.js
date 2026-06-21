@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// migrate.js — Runs schema.sql against the database
+// migrate.js - Runs schema.sql against the database
 // Usage: node migrate.js
 // ---------------------------------------------------------------------------
 require("dotenv").config();

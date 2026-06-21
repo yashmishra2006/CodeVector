@@ -1,43 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Browse 200,000+ products with lightning-fast cursor-based pagination" />
-  <title>CodeVeda — Product Browser</title>
+  <title>CodeVeda - Product Browser</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     /* ===== Design Tokens ===== */
     :root {
-      --bg-primary: #0a0a0f;
-      --bg-secondary: #12121a;
-      --bg-card: #1a1a26;
-      --bg-card-hover: #22222f;
-      --border: #2a2a3a;
-      --border-hover: #3a3a5a;
-      --text-primary: #e8e8f0;
-      --text-secondary: #8888a8;
-      --text-muted: #5a5a78;
-      --accent: #6c5ce7;
-      --accent-hover: #7c6cf7;
-      --accent-glow: rgba(108, 92, 231, 0.25);
+      --bg-primary: #ffffff;
+      --bg-secondary: #f8f8fa;
+      --bg-card: #ffffff;
+      --bg-card-hover: #fafafa;
+      --border: #1a1a1a;
+      --border-hover: #000000;
+      --text-primary: #111111;
+      --text-secondary: #444444;
+      --text-muted: #888888;
+      --accent: #111111;
+      --accent-hover: #333333;
+      --accent-glow: rgba(0, 0, 0, 0.08);
       --success: #00cec9;
       --warning: #fdcb6e;
       --danger: #e17055;
-      --price-color: #55efc4;
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 16px;
-      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-      --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.4);
-      --shadow-glow: 0 0 20px var(--accent-glow);
+      --price-color: #111111;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+      --shadow-glow: 0 1px 4px rgba(0, 0, 0, 0.1);
       --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     /* ===== Reset & Base ===== */
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
@@ -51,24 +54,7 @@
       overflow-x: hidden;
     }
 
-    /* ===== Animated Background ===== */
-    body::before {
-      content: "";
-      position: fixed;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(ellipse at 30% 20%, rgba(108, 92, 231, 0.06) 0%, transparent 50%),
-                  radial-gradient(ellipse at 70% 80%, rgba(0, 206, 201, 0.04) 0%, transparent 50%);
-      z-index: -1;
-      animation: bgShift 20s ease-in-out infinite alternate;
-    }
 
-    @keyframes bgShift {
-      0% { transform: translate(0, 0); }
-      100% { transform: translate(-5%, -3%); }
-    }
 
     /* ===== Container ===== */
     .container {
@@ -79,14 +65,13 @@
 
     /* ===== Header ===== */
     header {
-      padding: 32px 0 24px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 32px;
-      backdrop-filter: blur(20px);
+      padding: 10px 0;
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 24px;
       position: sticky;
       top: 0;
       z-index: 100;
-      background: rgba(10, 10, 15, 0.85);
+      background: #ffffff;
     }
 
     .header-content {
@@ -104,30 +89,26 @@
     }
 
     .logo-icon {
-      width: 40px;
-      height: 40px;
+      width: 32px;
+      height: 32px;
       border-radius: var(--radius-sm);
-      background: linear-gradient(135deg, var(--accent), var(--success));
+      background: #111111;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
+      font-size: 14px;
       font-weight: 700;
       color: white;
-      box-shadow: var(--shadow-glow);
     }
 
     .logo h1 {
-      font-size: 22px;
+      font-size: 17px;
       font-weight: 700;
-      background: linear-gradient(135deg, var(--text-primary), var(--accent));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--text-primary);
     }
 
     .logo span {
-      font-size: 13px;
+      font-size: 12px;
       color: var(--text-muted);
       font-weight: 400;
     }
@@ -190,13 +171,20 @@
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: var(--success);
+      background: #22c55e;
       animation: pulse 2s ease-in-out infinite;
     }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
     }
 
     /* ===== Product Grid ===== */
@@ -204,7 +192,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 16px;
-      margin-bottom: 32px;
+      margin-bottom: 16px;
     }
 
     .product-card {
@@ -243,15 +231,16 @@
 
     .product-category {
       display: inline-block;
-      padding: 4px 10px;
-      background: rgba(108, 92, 231, 0.12);
-      color: var(--accent);
-      border-radius: 100px;
-      font-size: 11px;
+      padding: 3px 8px;
+      background: #f3f3f3;
+      color: #555;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .product-name {
@@ -289,66 +278,38 @@
       opacity: 0.6;
     }
 
-    /* ===== Load More ===== */
-    .load-more-container {
+    /* ===== Scroll Sentinels & Status ===== */
+    .scroll-sentinel {
+      height: 1px;
+      width: 100%;
+    }
+
+    .scroll-status {
       text-align: center;
       padding: 24px 0 48px;
     }
 
-    .load-more-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 14px 36px;
-      background: linear-gradient(135deg, var(--accent), #5a4bd1);
-      color: white;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-family: inherit;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-      box-shadow: var(--shadow-glow);
-    }
-
-    .load-more-btn:hover:not(:disabled) {
-      background: linear-gradient(135deg, var(--accent-hover), #6a5be1);
-      transform: translateY(-1px);
-      box-shadow: 0 0 30px var(--accent-glow);
-    }
-
-    .load-more-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .load-more-btn .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
+    .scroll-spinner {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
       border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-      display: none;
-    }
-
-    .load-more-btn.loading .spinner {
-      display: block;
-    }
-
-    .load-more-btn.loading .btn-text {
-      display: none;
+      animation: spin 0.7s linear infinite;
     }
 
     @keyframes spin {
-      to { transform: rotate(360deg); }
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .end-message {
       color: var(--text-muted);
       font-size: 14px;
       padding: 24px;
+      text-align: center;
     }
 
     /* ===== Empty State ===== */
@@ -385,32 +346,50 @@
       margin-bottom: 10px;
     }
 
-    .skeleton-line.short { width: 40%; }
-    .skeleton-line.medium { width: 70%; }
-    .skeleton-line.long { width: 100%; }
-    .skeleton-line.price { width: 30%; height: 22px; margin-bottom: 14px; }
+    .skeleton-line.short {
+      width: 40%;
+    }
+
+    .skeleton-line.medium {
+      width: 70%;
+    }
+
+    .skeleton-line.long {
+      width: 100%;
+    }
+
+    .skeleton-line.price {
+      width: 30%;
+      height: 22px;
+      margin-bottom: 14px;
+    }
 
     @keyframes shimmer {
-      0% { opacity: 0.6; }
-      100% { opacity: 1; }
+      0% {
+        opacity: 0.6;
+      }
+
+      100% {
+        opacity: 1;
+      }
     }
 
     /* ===== Scrollbar ===== */
     ::-webkit-scrollbar {
-      width: 8px;
+      width: 6px;
     }
 
     ::-webkit-scrollbar-track {
-      background: var(--bg-primary);
+      background: #f5f5f5;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 4px;
+      background: #ccc;
+      border-radius: 3px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: var(--border-hover);
+      background: #999;
     }
 
     /* ===== Responsive ===== */
@@ -434,6 +413,7 @@
     }
   </style>
 </head>
+
 <body>
   <header>
     <div class="container header-content">
@@ -450,45 +430,80 @@
         </select>
         <div class="stats-badge">
           <span class="dot"></span>
-          <span><span class="count" id="totalCount">—</span> products</span>
+          <span><span class="count" id="totalCount">-</span> products</span>
         </div>
       </div>
     </div>
   </header>
 
   <main class="container">
+    <!-- Top sentinel: triggers backward loading when user scrolls up -->
+    <div id="topSentinel" class="scroll-sentinel"></div>
+    <div id="topStatus" class="scroll-status" style="display: none;">
+      <div class="scroll-spinner"></div>
+    </div>
+
     <div id="productGrid" class="product-grid"></div>
-    <div id="loadMoreContainer" class="load-more-container">
-      <button id="loadMoreBtn" class="load-more-btn" onclick="loadMore()">
-        <span class="spinner"></span>
-        <span class="btn-text">Load More</span>
-      </button>
+
+    <!-- Bottom sentinel: triggers forward loading when user scrolls down -->
+    <div id="bottomSentinel" class="scroll-sentinel"></div>
+    <div id="bottomStatus" class="scroll-status">
+      <div class="scroll-spinner"></div>
     </div>
   </main>
 
   <script>
+    // =========================================================================
+    // Sliding Window Pagination
+    //
+    // How it works:
+    //   - We keep a "window" of at most MAX_PAGES pages in the DOM.
+    //   - Each page is a group of PAGE_SIZE product cards.
+    //   - When the user scrolls down, we load the next page (forward) and
+    //     if the window exceeds MAX_PAGES, we prune the oldest page from the top.
+    //   - When the user scrolls back up into pruned territory, we load that
+    //     page backward and prune from the bottom.
+    //   - This keeps DOM size bounded (~100 cards max) regardless of dataset size.
+    //
+    // Data structures:
+    //   pages[] - array of { items[], topCursor, bottomCursor, element }
+    //   Each page's topCursor = cursor for the first (newest) item
+    //   Each page's bottomCursor = cursor for the last (oldest) item
+    // =========================================================================
+
+    const PAGE_SIZE = 20;
+    const MAX_PAGES = 5; // max pages in DOM = 100 items
+
     // -----------------------------------------------------------------------
     // State
     // -----------------------------------------------------------------------
-    let nextCursor = null;
+    let pages = [];          // sliding window of loaded pages
     let isLoading = false;
+    let hasMoreForward = true;
+    let hasMoreBackward = false; // false initially (we start at the top)
+    let isAtTop = true;      // whether we're showing the very first page
     let currentCategory = "";
-    const PAGE_SIZE = 20;
+
+    // Cursors for the edges of the current window
+    let forwardCursor = null;  // cursor to fetch next page going down
+    let backwardCursor = null; // cursor to fetch next page going up
 
     // -----------------------------------------------------------------------
     // DOM refs
     // -----------------------------------------------------------------------
     const grid = document.getElementById("productGrid");
-    const loadMoreBtn = document.getElementById("loadMoreBtn");
-    const loadMoreContainer = document.getElementById("loadMoreContainer");
+    const topSentinel = document.getElementById("topSentinel");
+    const bottomSentinel = document.getElementById("bottomSentinel");
+    const topStatus = document.getElementById("topStatus");
+    const bottomStatus = document.getElementById("bottomStatus");
     const categoryFilter = document.getElementById("categoryFilter");
     const totalCountEl = document.getElementById("totalCount");
 
     // -----------------------------------------------------------------------
-    // API calls
+    // API
     // -----------------------------------------------------------------------
-    async function fetchProducts(cursor = null, category = "") {
-      const params = new URLSearchParams({ limit: PAGE_SIZE });
+    async function fetchProducts(cursor, category, direction = "forward") {
+      const params = new URLSearchParams({ limit: PAGE_SIZE, direction });
       if (cursor) params.set("cursor", cursor);
       if (category) params.set("category", category);
 
@@ -504,24 +519,27 @@
     }
 
     // -----------------------------------------------------------------------
-    // Rendering
+    // Rendering helpers
     // -----------------------------------------------------------------------
     function formatDate(iso) {
       return new Date(iso).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
+        year: "numeric", month: "short", day: "numeric",
       });
     }
 
     function formatPrice(price) {
       return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
+        style: "currency", currency: "USD",
       }).format(price);
     }
 
-    function renderProduct(product) {
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function createCard(product) {
       const card = document.createElement("div");
       card.className = "product-card";
       card.innerHTML = `
@@ -536,9 +554,15 @@
       return card;
     }
 
-    function renderSkeletons(count = 8) {
+    function makeCursor(item) {
+      return Buffer.from
+        ? btoa(JSON.stringify({ created_at: item.created_at, id: item.id }))
+        : btoa(JSON.stringify({ created_at: item.created_at, id: item.id }));
+    }
+
+    function renderSkeletons() {
       let html = "";
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < 8; i++) {
         html += `
           <div class="skeleton-card">
             <div class="skeleton-line short"></div>
@@ -551,82 +575,234 @@
       return html;
     }
 
-    function escapeHtml(str) {
-      const div = document.createElement("div");
-      div.textContent = str;
-      return div.innerHTML;
+    // -----------------------------------------------------------------------
+    // Page management
+    // -----------------------------------------------------------------------
+
+    // Append a page of items to the bottom of the grid
+    function appendPage(items) {
+      const fragment = document.createDocumentFragment();
+      items.forEach((product, i) => {
+        const card = createCard(product);
+        card.style.opacity = "0";
+        card.style.transform = "translateY(12px)";
+        fragment.appendChild(card);
+        // Stagger animation
+        setTimeout(() => {
+          card.style.transition = "opacity 0.3s ease, transform 0.3s ease";
+          card.style.opacity = "1";
+          card.style.transform = "translateY(0)";
+        }, i * 20);
+      });
+
+      const page = {
+        items,
+        topCursor: makeCursor(items[0]),
+        bottomCursor: makeCursor(items[items.length - 1]),
+        cards: [...fragment.children],
+      };
+
+      grid.appendChild(fragment);
+      pages.push(page);
+      return page;
+    }
+
+    // Prepend a page of items to the top of the grid
+    function prependPage(items) {
+      const fragment = document.createDocumentFragment();
+      items.forEach((product) => {
+        const card = createCard(product);
+        fragment.appendChild(card);
+      });
+
+      const page = {
+        items,
+        topCursor: makeCursor(items[0]),
+        bottomCursor: makeCursor(items[items.length - 1]),
+        cards: [...fragment.children],
+      };
+
+      // Measure scroll before prepend to maintain position
+      const scrollBefore = document.documentElement.scrollHeight;
+      grid.insertBefore(fragment, grid.firstChild);
+      const scrollAfter = document.documentElement.scrollHeight;
+      // Adjust scroll so the user doesn't see a jump
+      window.scrollBy(0, scrollAfter - scrollBefore);
+
+      pages.unshift(page);
+      return page;
+    }
+
+    // Prune pages from the top (when window exceeds MAX_PAGES, scrolling down)
+    function pruneTop() {
+      while (pages.length > MAX_PAGES) {
+        const removed = pages.shift();
+        const scrollBefore = document.documentElement.scrollHeight;
+        removed.cards.forEach((card) => card.remove());
+        const scrollAfter = document.documentElement.scrollHeight;
+        // Adjust scroll position so content doesn't jump
+        window.scrollBy(0, scrollAfter - scrollBefore);
+
+        // We now have content above that was pruned
+        hasMoreBackward = true;
+        isAtTop = false;
+      }
+      // Update backward cursor to the top edge of current window
+      if (pages.length > 0) {
+        backwardCursor = pages[0].topCursor;
+      }
+    }
+
+    // Prune pages from the bottom (when window exceeds MAX_PAGES, scrolling up)
+    function pruneBottom() {
+      while (pages.length > MAX_PAGES) {
+        const removed = pages.pop();
+        removed.cards.forEach((card) => card.remove());
+
+        // We now have content below that was pruned
+        hasMoreForward = true;
+      }
+      // Update forward cursor to the bottom edge of current window
+      if (pages.length > 0) {
+        forwardCursor = pages[pages.length - 1].bottomCursor;
+      }
     }
 
     // -----------------------------------------------------------------------
-    // Data loading
+    // Load forward (scrolling down - older items)
     // -----------------------------------------------------------------------
-    async function loadProducts(reset = false) {
-      if (isLoading) return;
+    async function loadForward() {
+      if (isLoading || !hasMoreForward) return;
       isLoading = true;
-      loadMoreBtn.classList.add("loading");
-      loadMoreBtn.disabled = true;
-
-      if (reset) {
-        nextCursor = null;
-        grid.innerHTML = renderSkeletons();
-      }
+      bottomStatus.style.display = "";
+      bottomStatus.innerHTML = '<div class="scroll-spinner"></div>';
 
       try {
-        const result = await fetchProducts(nextCursor, currentCategory);
+        const result = await fetchProducts(forwardCursor, currentCategory, "forward");
 
-        if (reset) grid.innerHTML = "";
+        if (result.data.length === 0) {
+          hasMoreForward = false;
+          bottomStatus.innerHTML = '<p class="end-message">You\'ve reached the end ✨</p>';
+          isLoading = false;
+          return;
+        }
 
-        // Append product cards with stagger animation
-        result.data.forEach((product, i) => {
-          const card = renderProduct(product);
-          card.style.opacity = "0";
-          card.style.transform = "translateY(12px)";
-          grid.appendChild(card);
-
-          // Stagger the fade-in
-          setTimeout(() => {
-            card.style.transition = "opacity 0.3s ease, transform 0.3s ease";
-            card.style.opacity = "1";
-            card.style.transform = "translateY(0)";
-          }, i * 30);
-        });
-
-        // Update state
-        nextCursor = result.pagination.next_cursor;
+        appendPage(result.data);
+        hasMoreForward = result.pagination.has_more;
+        forwardCursor = result.pagination.next_cursor;
         totalCountEl.textContent = Number(result.meta.total_count).toLocaleString();
 
-        // Show/hide load more
-        if (!result.pagination.has_more) {
-          loadMoreContainer.innerHTML = '<p class="end-message">You\'ve reached the end ✨</p>';
+        if (!hasMoreForward) {
+          bottomStatus.innerHTML = '<p class="end-message">You\'ve reached the end ✨</p>';
+        } else {
+          bottomStatus.innerHTML = '';
         }
+
+        // Prune from top if window is too big
+        pruneTop();
       } catch (err) {
         console.error("Failed to load products:", err);
-        if (reset) {
-          grid.innerHTML = `
-            <div class="empty-state" style="grid-column: 1/-1">
-              <div class="icon">⚠️</div>
-              <h3>Failed to load products</h3>
-              <p>${escapeHtml(err.message)}</p>
-            </div>
-          `;
-        }
+        bottomStatus.innerHTML = `<p class="end-message">Error loading products</p>`;
       } finally {
         isLoading = false;
-        loadMoreBtn.classList.remove("loading");
-        loadMoreBtn.disabled = false;
       }
     }
 
-    async function loadMore() {
-      await loadProducts(false);
+    // -----------------------------------------------------------------------
+    // Load backward (scrolling up - newer items)
+    // -----------------------------------------------------------------------
+    async function loadBackward() {
+      if (isLoading || !hasMoreBackward || isAtTop) return;
+      isLoading = true;
+      topStatus.style.display = "";
+      topStatus.innerHTML = '<div class="scroll-spinner"></div>';
+
+      try {
+        const result = await fetchProducts(backwardCursor, currentCategory, "backward");
+
+        if (result.data.length === 0) {
+          hasMoreBackward = false;
+          isAtTop = true;
+          topStatus.style.display = "none";
+          isLoading = false;
+          return;
+        }
+
+        prependPage(result.data);
+        hasMoreBackward = result.pagination.has_more;
+
+        if (result.pagination.has_more) {
+          backwardCursor = result.pagination.next_cursor;
+        } else {
+          // We've reached the very top
+          isAtTop = true;
+          hasMoreBackward = false;
+        }
+
+        topStatus.style.display = "none";
+
+        // Prune from bottom if window is too big
+        pruneBottom();
+      } catch (err) {
+        console.error("Failed to load backward:", err);
+        topStatus.style.display = "none";
+      } finally {
+        isLoading = false;
+      }
     }
 
     // -----------------------------------------------------------------------
-    // Category filter
+    // IntersectionObservers for both directions
     // -----------------------------------------------------------------------
+    const bottomObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isLoading && hasMoreForward) {
+          loadForward();
+        }
+      },
+      { rootMargin: "0px 0px 300px 0px" }
+    );
+
+    const topObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isLoading && hasMoreBackward && !isAtTop) {
+          loadBackward();
+        }
+      },
+      { rootMargin: "300px 0px 0px 0px" }
+    );
+
+    bottomObserver.observe(bottomSentinel);
+    topObserver.observe(topSentinel);
+
+    // -----------------------------------------------------------------------
+    // Initial load & category filter
+    // -----------------------------------------------------------------------
+    async function initLoad() {
+      // Reset everything
+      pages = [];
+      grid.innerHTML = renderSkeletons();
+      forwardCursor = null;
+      backwardCursor = null;
+      hasMoreForward = true;
+      hasMoreBackward = false;
+      isAtTop = true;
+      isLoading = false;
+      topStatus.style.display = "none";
+      bottomStatus.style.display = "";
+      bottomStatus.innerHTML = '<div class="scroll-spinner"></div>';
+
+      // Small delay to show skeletons
+      await new Promise((r) => setTimeout(r, 100));
+      grid.innerHTML = "";
+
+      await loadForward();
+    }
+
     categoryFilter.addEventListener("change", () => {
       currentCategory = categoryFilter.value;
-      loadProducts(true);
+      window.scrollTo(0, 0);
+      initLoad();
     });
 
     async function initCategories() {
@@ -644,10 +820,11 @@
     }
 
     // -----------------------------------------------------------------------
-    // Init
+    // Boot
     // -----------------------------------------------------------------------
     initCategories();
-    loadProducts(true);
+    initLoad();
   </script>
 </body>
+
 </html>

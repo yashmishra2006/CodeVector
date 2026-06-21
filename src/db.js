@@ -1,7 +1,7 @@
 const { Pool } = require("pg");
 
 // Create a connection pool from DATABASE_URL
-// Pool reuses connections — avoids the overhead of connecting per query
+// Pool reuses connections - avoids the overhead of connecting per query
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   // Sensible defaults for a small free-tier deployment
