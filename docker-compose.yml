@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: codeveda
+      POSTGRES_PASSWORD: codeveda
+      POSTGRES_DB: codeveda
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://codeveda:codeveda@db:5432/codeveda
+      NODE_ENV: production
+      PORT: 3000
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

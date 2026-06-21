@@ -8,7 +8,7 @@ const pool = new Pool({
   max: 10, // max simultaneous connections
   idleTimeoutMillis: 30000, // close idle connections after 30s
   connectionTimeoutMillis: 5000, // fail fast if DB is unreachable
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  ssl: false,
 });
 
 // Log pool errors (don't crash the server)
