@@ -471,8 +471,8 @@
     //   Each page's bottomCursor = cursor for the last (oldest) item
     // =========================================================================
 
-    const PAGE_SIZE = 20;
-    const MAX_PAGES = 5; // max pages in DOM = 100 items
+    const PAGE_SIZE = 200;
+    const MAX_PAGES = 3; // max pages in DOM = 600 items
 
     // -----------------------------------------------------------------------
     // State
@@ -762,7 +762,7 @@
           loadForward();
         }
       },
-      { rootMargin: "0px 0px 300px 0px" }
+      { rootMargin: "0px 0px 4000px 0px" }
     );
 
     const topObserver = new IntersectionObserver(
@@ -771,7 +771,7 @@
           loadBackward();
         }
       },
-      { rootMargin: "300px 0px 0px 0px" }
+      { rootMargin: "4000px 0px 0px 0px" }
     );
 
     bottomObserver.observe(bottomSentinel);
@@ -782,7 +782,7 @@
     // because the sentinel never left the viewport between loads.
     function isSentinelVisible(el) {
       const rect = el.getBoundingClientRect();
-      return rect.top < window.innerHeight + 300 && rect.bottom > -300;
+      return rect.top < window.innerHeight + 4000 && rect.bottom > -4000;
     }
 
     function scheduleCheck() {

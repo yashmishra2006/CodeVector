@@ -29,7 +29,7 @@ const router = express.Router();
 router.get("/products", async (req, res) => {
   try {
     const category = req.query.category || null;
-    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 200, 1), 200);
     const direction = req.query.direction === "backward" ? "backward" : "forward";
 
     let cursorCreatedAt = null;
