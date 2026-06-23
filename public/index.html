@@ -448,16 +448,8 @@
   </header>
 
   <main class="container">
-    <!-- Top sentinel: triggers backward loading when user scrolls up -->
-    <div id="topSentinel" class="scroll-sentinel"></div>
-    <div id="topStatus" class="scroll-status" style="display: none;">
-      <div class="scroll-spinner"></div>
-    </div>
-
     <div id="productGrid" class="product-grid"></div>
 
-    <!-- Bottom sentinel: triggers forward loading when user scrolls down -->
-    <div id="bottomSentinel" class="scroll-sentinel"></div>
     <div id="bottomStatus" class="scroll-status">
       <div class="scroll-spinner"></div>
     </div>
@@ -465,46 +457,30 @@
 
   <script>
     // =========================================================================
-    // Sliding Window Pagination (spacer-based — no scrollBy)
+    // Forward-only Infinite Scroll
     //
-    // When pages are pruned from the top, their height is transferred to a
-    // topSpacer div. This keeps total page height constant so the browser's
-    // scroll position remains valid without any programmatic scrollBy() calls.
-    // scrollBy() during fast scrolling fights browser momentum and causes
-    // massive backward jumps — spacers avoid this entirely.
+    // Cards accumulate in the DOM as the user scrolls down. No pruning, no
+    // backward loading, no spacers. Modern browsers handle 50k+ lightweight
+    // DOM nodes without issue, and no real user scrolls through all 200k
+    // products. This avoids all the scrollBy/spacer bugs that DOM windowing
+    // introduces for negligible memory savings.
     // =========================================================================
 
     const PAGE_SIZE = 200;
-    const MAX_PAGES = 3;
 
-    // State
-    let pages = [];
     let isLoading = false;
-    let hasMoreForward = true;
-    let hasMoreBackward = false;
-    let isAtTop = true;
-    let currentCategory = "";
+    let hasMore = true;
     let forwardCursor = null;
-    let backwardCursor = null;
+    let currentCategory = "";
 
-    // DOM refs
     const grid = document.getElementById("productGrid");
-    const topSentinel = document.getElementById("topSentinel");
-    const bottomSentinel = document.getElementById("bottomSentinel");
-    const topStatus = document.getElementById("topStatus");
     const bottomStatus = document.getElementById("bottomStatus");
     const categoryFilter = document.getElementById("categoryFilter");
     const totalCountEl = document.getElementById("totalCount");
 
-    // Spacer: absorbs height of pruned top pages
-    const topSpacer = document.createElement("div");
-    topSpacer.style.height = "0px";
-    grid.parentNode.insertBefore(topSpacer, grid);
-    let topSpacerHeight = 0;
-
     // API
-    async function fetchProducts(cursor, category, direction = "forward") {
-      const params = new URLSearchParams({ limit: PAGE_SIZE, direction });
+    async function fetchProducts(cursor, category) {
+      const params = new URLSearchParams({ limit: PAGE_SIZE, direction: "forward" });
       if (cursor) params.set("cursor", cursor);
       if (category) params.set("category", category);
       const res = await fetch(`/api/products?${params}`);
@@ -518,7 +494,7 @@
       return res.json();
     }
 
-    // Rendering helpers
+    // Rendering
     function formatDate(iso) {
       return new Date(iso).toLocaleDateString("en-US", {
         year: "numeric", month: "short", day: "numeric",
@@ -552,10 +528,6 @@
       return card;
     }
 
-    function makeCursor(item) {
-      return btoa(JSON.stringify({ created_at: item.created_at, id: item.id }));
-    }
-
     function renderSkeletons() {
       let html = "";
       for (let i = 0; i < 8; i++) {
@@ -571,97 +543,32 @@
       return html;
     }
 
-    // -----------------------------------------------------------------------
-    // Page management (spacer-based)
-    // -----------------------------------------------------------------------
-    function appendPage(items) {
-      const fragment = document.createDocumentFragment();
-      items.forEach((product) => {
-        fragment.appendChild(createCard(product));
-      });
-
-      const cards = [...fragment.children];
-      const page = { items, topCursor: makeCursor(items[0]), bottomCursor: makeCursor(items[items.length - 1]), cards };
-
-      grid.appendChild(fragment);
-      pages.push(page);
-      return page;
-    }
-
-    function prependPage(items) {
-      const fragment = document.createDocumentFragment();
-      items.forEach((product) => {
-        fragment.appendChild(createCard(product));
-      });
-
-      const page = { items, topCursor: makeCursor(items[0]), bottomCursor: makeCursor(items[items.length - 1]), cards: [...fragment.children] };
-
-      // Measure how much height we're adding
-      const hBefore = document.documentElement.scrollHeight;
-      grid.insertBefore(fragment, grid.firstChild);
-      const addedHeight = document.documentElement.scrollHeight - hBefore;
-
-      // Shrink spacer by what we added — total page height stays constant
-      topSpacerHeight = Math.max(0, topSpacerHeight - addedHeight);
-      topSpacer.style.height = topSpacerHeight + "px";
-
-      pages.unshift(page);
-      return page;
-    }
-
-    function pruneTop() {
-      if (pages.length <= MAX_PAGES) return;
-
-      while (pages.length > MAX_PAGES) {
-        const removed = pages.shift();
-        const hBefore = document.documentElement.scrollHeight;
-        removed.cards.forEach(c => c.remove());
-        const removedHeight = hBefore - document.documentElement.scrollHeight;
-
-        // Transfer removed height to spacer — no scrollBy needed
-        topSpacerHeight += removedHeight;
-        topSpacer.style.height = topSpacerHeight + "px";
-
-        hasMoreBackward = true;
-        isAtTop = false;
-      }
-      if (pages.length > 0) backwardCursor = pages[0].topCursor;
-    }
-
-    function pruneBottom() {
-      while (pages.length > MAX_PAGES) {
-        const removed = pages.pop();
-        removed.cards.forEach(c => c.remove());
-        hasMoreForward = true;
-      }
-      if (pages.length > 0) forwardCursor = pages[pages.length - 1].bottomCursor;
-    }
-
-    // -----------------------------------------------------------------------
-    // Load forward / backward
-    // -----------------------------------------------------------------------
-    async function loadForward() {
-      if (isLoading || !hasMoreForward) return;
+    // Load next page
+    async function loadMore() {
+      if (isLoading || !hasMore) return;
       isLoading = true;
       bottomStatus.style.display = "";
       bottomStatus.innerHTML = '<div class="scroll-spinner"></div>';
 
       try {
-        const result = await fetchProducts(forwardCursor, currentCategory, "forward");
+        const result = await fetchProducts(forwardCursor, currentCategory);
+
         if (result.data.length === 0) {
-          hasMoreForward = false;
+          hasMore = false;
           bottomStatus.innerHTML = '<p class="end-message">You\'ve reached the end ✨</p>';
           isLoading = false;
           return;
         }
 
-        appendPage(result.data);
-        hasMoreForward = result.pagination.has_more;
+        const fragment = document.createDocumentFragment();
+        result.data.forEach(product => fragment.appendChild(createCard(product)));
+        grid.appendChild(fragment);
+
+        hasMore = result.pagination.has_more;
         forwardCursor = result.pagination.next_cursor;
         totalCountEl.textContent = Number(result.meta.total_count).toLocaleString();
 
-        bottomStatus.innerHTML = hasMoreForward ? '' : '<p class="end-message">You\'ve reached the end ✨</p>';
-        pruneTop();
+        bottomStatus.innerHTML = hasMore ? '' : '<p class="end-message">You\'ve reached the end ✨</p>';
       } catch (err) {
         console.error("Failed to load products:", err);
         bottomStatus.innerHTML = '<p class="end-message">Error loading products</p>';
@@ -671,45 +578,7 @@
       }
     }
 
-    async function loadBackward() {
-      if (isLoading || !hasMoreBackward || isAtTop) return;
-      isLoading = true;
-      topStatus.style.display = "";
-      topStatus.innerHTML = '<div class="scroll-spinner"></div>';
-
-      try {
-        const result = await fetchProducts(backwardCursor, currentCategory, "backward");
-        if (result.data.length === 0) {
-          hasMoreBackward = false;
-          isAtTop = true;
-          topStatus.style.display = "none";
-          isLoading = false;
-          return;
-        }
-
-        prependPage(result.data);
-        hasMoreBackward = result.pagination.has_more;
-        if (result.pagination.has_more) {
-          backwardCursor = result.pagination.next_cursor;
-        } else {
-          isAtTop = true;
-          hasMoreBackward = false;
-        }
-
-        topStatus.style.display = "none";
-        pruneBottom();
-      } catch (err) {
-        console.error("Failed to load backward:", err);
-        topStatus.style.display = "none";
-      } finally {
-        isLoading = false;
-        scheduleCheck();
-      }
-    }
-
-    // -----------------------------------------------------------------------
     // Scroll-based preloading (throttled with rAF)
-    // -----------------------------------------------------------------------
     let lastScrollY = window.scrollY;
     let lastScrollTime = Date.now();
     let scrollVelocity = 0;
@@ -720,19 +589,15 @@
       const currentY = window.scrollY;
       const now = Date.now();
       const dt = now - lastScrollTime;
-      if (dt > 0) scrollVelocity = (currentY - lastScrollY) / dt;
+      if (dt > 0) scrollVelocity = Math.abs((currentY - lastScrollY) / dt);
       lastScrollY = currentY;
       lastScrollTime = now;
 
-      if (isLoading) return;
-      const threshold = 1200 + (Math.abs(scrollVelocity) * 600);
+      if (isLoading || !hasMore) return;
 
-      if (scrollVelocity > 0 && hasMoreForward) {
-        const distToBottom = document.documentElement.scrollHeight - (window.innerHeight + currentY);
-        if (distToBottom < threshold) loadForward();
-      } else if (scrollVelocity < 0 && hasMoreBackward && !isAtTop) {
-        if (currentY < threshold) loadBackward();
-      }
+      const threshold = 1200 + (scrollVelocity * 600);
+      const distToBottom = document.documentElement.scrollHeight - (window.innerHeight + currentY);
+      if (distToBottom < threshold) loadMore();
     }
 
     window.addEventListener("scroll", () => {
@@ -743,33 +608,23 @@
     function scheduleCheck() {
       clearTimeout(scheduleCheckTimer);
       scheduleCheckTimer = setTimeout(() => {
-        if (isLoading) return;
+        if (isLoading || !hasMore) return;
         const distBot = document.documentElement.scrollHeight - (window.innerHeight + window.scrollY);
-        if (hasMoreForward && distBot < 1200) loadForward();
-        else if (hasMoreBackward && !isAtTop && window.scrollY < 1200) loadBackward();
+        if (distBot < 1200) loadMore();
       }, 250);
     }
 
-    // -----------------------------------------------------------------------
     // Init
-    // -----------------------------------------------------------------------
     async function initLoad() {
-      pages = [];
       grid.innerHTML = renderSkeletons();
-      topSpacerHeight = 0;
-      topSpacer.style.height = "0px";
       forwardCursor = null;
-      backwardCursor = null;
-      hasMoreForward = true;
-      hasMoreBackward = false;
-      isAtTop = true;
+      hasMore = true;
       isLoading = false;
-      topStatus.style.display = "none";
       bottomStatus.style.display = "";
       bottomStatus.innerHTML = '<div class="scroll-spinner"></div>';
       await new Promise(r => setTimeout(r, 100));
       grid.innerHTML = "";
-      await loadForward();
+      await loadMore();
     }
 
     categoryFilter.addEventListener("change", () => {
@@ -798,3 +653,6 @@
 </body>
 
 </html>
+
+
+

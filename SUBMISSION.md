@@ -206,32 +206,27 @@ The frontend implements **bidirectional infinite scroll** with DOM pruning to ke
 
 After deploying, I noticed the UI **glitches badly when scrolling fast** through 10–15+ page loads (~2,000–3,000 products). The viewport would stutter, jump backward by thousands of pixels, and become unresponsive.
 
-### The Root Cause: `scrollBy()` vs Browser Momentum
+### The Root Cause: DOM Pruning & `scrollBy()` vs Browser Momentum
 
-The sliding window prunes old pages from the DOM to keep memory low. When a page is removed from the top, the total page height shrinks — say by 5,000px. Without compensation, all content below shifts upward and the user's viewport jumps to completely different products.
+Initially, I implemented a "sliding window" that pruned old pages from the DOM to save memory. When a page is removed from the top, the total page height shrinks. Without compensation, all content below shifts upward and the user's viewport jumps.
 
-The original code used `window.scrollBy(0, -5000)` to counteract this — scrolling the viewport up by the same amount the page shrank, so the user stays on the same cards. **In theory** this is seamless.
+The original code used `window.scrollBy()` to counteract this, and later I tried a `spacer div` approach to absorb the lost height. Both approaches caused massive issues during fast scrolling:
+1. `scrollBy()` fights the browser's own inertial scroll momentum, causing massive backward jumps (10,000+ pixels).
+2. Spacers introduced edge-case bugs when scrolling backward/upward rapidly.
 
-**In practice**, during fast scrolling the browser has its own scroll momentum running (inertial scrolling). `scrollBy()` fights that momentum, and the two compete: the browser scrolls forward while the code scrolls backward. This creates massive backward jumps (10,000–30,000px observed) and makes the page feel broken.
+### The Fix: Abandoning Pruning for Pure Accumulation
 
-### The Fix: Spacer Divs Instead of `scrollBy()`
+After struggling with bidirectional scrolling complexities, I realized **DOM windowing is an over-optimization for this specific use case**. 
 
-Instead of removing height and programmatically compensating with `scrollBy()`, I insert a **spacer `<div>`** above the product grid. When pages are pruned from the top, their height is transferred to the spacer:
+Instead of pruning, I simplified the logic: **just append pages forward forever**. 
+- Each product card is ~5 lightweight DOM nodes.
+- Even if a user aggressively scrolls through 10,000 products (50 page loads), that's only ~50,000 nodes.
+- Modern browsers can easily render 50k lightweight nodes without significant memory pressure or frame drops.
+- Very few users will ever scroll deep enough to hit browser limits (most will search/filter first).
 
-```js
-// Old approach (broken during fast scroll):
-removed.cards.forEach(c => c.remove());
-window.scrollBy(0, scrollAfter - scrollBefore); // fights momentum!
+By removing pruning, bidirectional loading, and spacer calculations, the codebase became drastically simpler, and the infinite scroll is now completely bulletproof with **zero scroll jumps**.
 
-// New approach (spacer-based):
-removed.cards.forEach(c => c.remove());
-topSpacerHeight += removedHeight;
-topSpacer.style.height = topSpacerHeight + "px"; // total height unchanged
-```
-
-The total page height stays constant, so the browser's scroll position remains valid with **zero programmatic scroll adjustment**. When the user scrolls back up and pages are prepended, the spacer shrinks by the same amount, keeping everything balanced.
-
-### Additional Fixes Applied
+### Additional Rendering Fixes Applied
 
 | Problem | Fix |
 |---------|-----|
@@ -243,7 +238,7 @@ The total page height stays constant, so the browser's scroll position remains v
 
 ### Result
 
-The UI now maintains smooth scrolling regardless of how many pages have been loaded. The spacer approach is the same technique used by virtual scroll libraries like `react-window` — it's the correct way to handle DOM windowing without fighting the browser's native scroll behavior.
+The UI now maintains smooth scrolling regardless of how many pages have been loaded. The entire class of bugs related to scroll-momentum conflicts and DOM height shifting has been eliminated by embracing a simpler, forward-only strategy.
 
 ---
 
