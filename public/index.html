@@ -465,43 +465,29 @@
 
   <script>
     // =========================================================================
-    // Sliding Window Pagination
+    // Sliding Window Pagination (spacer-based — no scrollBy)
     //
-    // How it works:
-    //   - We keep a "window" of at most MAX_PAGES pages in the DOM.
-    //   - Each page is a group of PAGE_SIZE product cards.
-    //   - When the user scrolls down, we load the next page (forward) and
-    //     if the window exceeds MAX_PAGES, we prune the oldest page from the top.
-    //   - When the user scrolls back up into pruned territory, we load that
-    //     page backward and prune from the bottom.
-    //   - This keeps DOM size bounded (~100 cards max) regardless of dataset size.
-    //
-    // Data structures:
-    //   pages[] - array of { items[], topCursor, bottomCursor, element }
-    //   Each page's topCursor = cursor for the first (newest) item
-    //   Each page's bottomCursor = cursor for the last (oldest) item
+    // When pages are pruned from the top, their height is transferred to a
+    // topSpacer div. This keeps total page height constant so the browser's
+    // scroll position remains valid without any programmatic scrollBy() calls.
+    // scrollBy() during fast scrolling fights browser momentum and causes
+    // massive backward jumps — spacers avoid this entirely.
     // =========================================================================
 
     const PAGE_SIZE = 200;
-    const MAX_PAGES = 3; // max pages in DOM = 600 items
+    const MAX_PAGES = 3;
 
-    // -----------------------------------------------------------------------
     // State
-    // -----------------------------------------------------------------------
-    let pages = [];          // sliding window of loaded pages
+    let pages = [];
     let isLoading = false;
     let hasMoreForward = true;
-    let hasMoreBackward = false; // false initially (we start at the top)
-    let isAtTop = true;      // whether we're showing the very first page
+    let hasMoreBackward = false;
+    let isAtTop = true;
     let currentCategory = "";
+    let forwardCursor = null;
+    let backwardCursor = null;
 
-    // Cursors for the edges of the current window
-    let forwardCursor = null;  // cursor to fetch next page going down
-    let backwardCursor = null; // cursor to fetch next page going up
-
-    // -----------------------------------------------------------------------
     // DOM refs
-    // -----------------------------------------------------------------------
     const grid = document.getElementById("productGrid");
     const topSentinel = document.getElementById("topSentinel");
     const bottomSentinel = document.getElementById("bottomSentinel");
@@ -510,14 +496,17 @@
     const categoryFilter = document.getElementById("categoryFilter");
     const totalCountEl = document.getElementById("totalCount");
 
-    // -----------------------------------------------------------------------
+    // Spacer: absorbs height of pruned top pages
+    const topSpacer = document.createElement("div");
+    topSpacer.style.height = "0px";
+    grid.parentNode.insertBefore(topSpacer, grid);
+    let topSpacerHeight = 0;
+
     // API
-    // -----------------------------------------------------------------------
     async function fetchProducts(cursor, category, direction = "forward") {
       const params = new URLSearchParams({ limit: PAGE_SIZE, direction });
       if (cursor) params.set("cursor", cursor);
       if (category) params.set("category", category);
-
       const res = await fetch(`/api/products?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
@@ -529,9 +518,7 @@
       return res.json();
     }
 
-    // -----------------------------------------------------------------------
     // Rendering helpers
-    // -----------------------------------------------------------------------
     function formatDate(iso) {
       return new Date(iso).toLocaleDateString("en-US", {
         year: "numeric", month: "short", day: "numeric",
@@ -585,105 +572,73 @@
     }
 
     // -----------------------------------------------------------------------
-    // Page management
+    // Page management (spacer-based)
     // -----------------------------------------------------------------------
-
-    // Append a page of items to the bottom of the grid
     function appendPage(items) {
       const fragment = document.createDocumentFragment();
       items.forEach((product) => {
-        const card = createCard(product);
-        card.classList.add("card-enter");
-        fragment.appendChild(card);
+        fragment.appendChild(createCard(product));
       });
 
       const cards = [...fragment.children];
-      const page = {
-        items,
-        topCursor: makeCursor(items[0]),
-        bottomCursor: makeCursor(items[items.length - 1]),
-        cards,
-      };
+      const page = { items, topCursor: makeCursor(items[0]), bottomCursor: makeCursor(items[items.length - 1]), cards };
 
       grid.appendChild(fragment);
       pages.push(page);
-
-      // Clean up animation class after animation ends to free compositor layers
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          cards.forEach(c => c.classList.remove("card-enter"));
-        }, 300);
-      });
-
       return page;
     }
 
-    // Prepend a page of items to the top of the grid
     function prependPage(items) {
       const fragment = document.createDocumentFragment();
       items.forEach((product) => {
-        const card = createCard(product);
-        fragment.appendChild(card);
+        fragment.appendChild(createCard(product));
       });
 
-      const page = {
-        items,
-        topCursor: makeCursor(items[0]),
-        bottomCursor: makeCursor(items[items.length - 1]),
-        cards: [...fragment.children],
-      };
+      const page = { items, topCursor: makeCursor(items[0]), bottomCursor: makeCursor(items[items.length - 1]), cards: [...fragment.children] };
 
-      // Measure scroll before prepend to maintain position
-      const scrollBefore = document.documentElement.scrollHeight;
+      // Measure how much height we're adding
+      const hBefore = document.documentElement.scrollHeight;
       grid.insertBefore(fragment, grid.firstChild);
-      const scrollAfter = document.documentElement.scrollHeight;
-      // Adjust scroll so the user doesn't see a jump
-      window.scrollBy(0, scrollAfter - scrollBefore);
+      const addedHeight = document.documentElement.scrollHeight - hBefore;
+
+      // Shrink spacer by what we added — total page height stays constant
+      topSpacerHeight = Math.max(0, topSpacerHeight - addedHeight);
+      topSpacer.style.height = topSpacerHeight + "px";
 
       pages.unshift(page);
       return page;
     }
 
-    // Prune pages from the top (when window exceeds MAX_PAGES, scrolling down)
     function pruneTop() {
       if (pages.length <= MAX_PAGES) return;
 
-      // Batch-remove all excess pages in one reflow
-      const toRemove = [];
       while (pages.length > MAX_PAGES) {
-        toRemove.push(pages.shift());
+        const removed = pages.shift();
+        const hBefore = document.documentElement.scrollHeight;
+        removed.cards.forEach(c => c.remove());
+        const removedHeight = hBefore - document.documentElement.scrollHeight;
+
+        // Transfer removed height to spacer — no scrollBy needed
+        topSpacerHeight += removedHeight;
+        topSpacer.style.height = topSpacerHeight + "px";
+
         hasMoreBackward = true;
         isAtTop = false;
       }
-
-      const scrollBefore = document.documentElement.scrollHeight;
-      toRemove.forEach(p => p.cards.forEach(c => c.remove()));
-      const scrollAfter = document.documentElement.scrollHeight;
-      const delta = scrollAfter - scrollBefore;
-      if (delta !== 0) window.scrollBy(0, delta);
-
-      if (pages.length > 0) {
-        backwardCursor = pages[0].topCursor;
-      }
+      if (pages.length > 0) backwardCursor = pages[0].topCursor;
     }
 
-    // Prune pages from the bottom (when window exceeds MAX_PAGES, scrolling up)
     function pruneBottom() {
       while (pages.length > MAX_PAGES) {
         const removed = pages.pop();
-        removed.cards.forEach((card) => card.remove());
-
-        // We now have content below that was pruned
+        removed.cards.forEach(c => c.remove());
         hasMoreForward = true;
       }
-      // Update forward cursor to the bottom edge of current window
-      if (pages.length > 0) {
-        forwardCursor = pages[pages.length - 1].bottomCursor;
-      }
+      if (pages.length > 0) forwardCursor = pages[pages.length - 1].bottomCursor;
     }
 
     // -----------------------------------------------------------------------
-    // Load forward (scrolling down - older items)
+    // Load forward / backward
     // -----------------------------------------------------------------------
     async function loadForward() {
       if (isLoading || !hasMoreForward) return;
@@ -693,7 +648,6 @@
 
       try {
         const result = await fetchProducts(forwardCursor, currentCategory, "forward");
-
         if (result.data.length === 0) {
           hasMoreForward = false;
           bottomStatus.innerHTML = '<p class="end-message">You\'ve reached the end ✨</p>';
@@ -706,28 +660,17 @@
         forwardCursor = result.pagination.next_cursor;
         totalCountEl.textContent = Number(result.meta.total_count).toLocaleString();
 
-        if (!hasMoreForward) {
-          bottomStatus.innerHTML = '<p class="end-message">You\'ve reached the end ✨</p>';
-        } else {
-          bottomStatus.innerHTML = '';
-        }
-
-        // Prune from top if window is too big
+        bottomStatus.innerHTML = hasMoreForward ? '' : '<p class="end-message">You\'ve reached the end ✨</p>';
         pruneTop();
       } catch (err) {
         console.error("Failed to load products:", err);
-        bottomStatus.innerHTML = `<p class="end-message">Error loading products</p>`;
+        bottomStatus.innerHTML = '<p class="end-message">Error loading products</p>';
       } finally {
         isLoading = false;
-        // If sentinel is still visible after load, trigger again
-        // (IntersectionObserver only fires on transitions, not while staying visible)
         scheduleCheck();
       }
     }
 
-    // -----------------------------------------------------------------------
-    // Load backward (scrolling up - newer items)
-    // -----------------------------------------------------------------------
     async function loadBackward() {
       if (isLoading || !hasMoreBackward || isAtTop) return;
       isLoading = true;
@@ -736,7 +679,6 @@
 
       try {
         const result = await fetchProducts(backwardCursor, currentCategory, "backward");
-
         if (result.data.length === 0) {
           hasMoreBackward = false;
           isAtTop = true;
@@ -747,18 +689,14 @@
 
         prependPage(result.data);
         hasMoreBackward = result.pagination.has_more;
-
         if (result.pagination.has_more) {
           backwardCursor = result.pagination.next_cursor;
         } else {
-          // We've reached the very top
           isAtTop = true;
           hasMoreBackward = false;
         }
 
         topStatus.style.display = "none";
-
-        // Prune from bottom if window is too big
         pruneBottom();
       } catch (err) {
         console.error("Failed to load backward:", err);
@@ -770,7 +708,7 @@
     }
 
     // -----------------------------------------------------------------------
-    // Dynamic Scroll-Velocity Preloading (throttled to 1 check per 100ms)
+    // Scroll-based preloading (throttled with rAF)
     // -----------------------------------------------------------------------
     let lastScrollY = window.scrollY;
     let lastScrollTime = Date.now();
@@ -780,55 +718,46 @@
     function onScrollTick() {
       scrollTicking = false;
       const currentY = window.scrollY;
-      const currentTime = Date.now();
-      const dt = currentTime - lastScrollTime;
-
-      if (dt > 0) {
-        scrollVelocity = (currentY - lastScrollY) / dt;
-      }
+      const now = Date.now();
+      const dt = now - lastScrollTime;
+      if (dt > 0) scrollVelocity = (currentY - lastScrollY) / dt;
       lastScrollY = currentY;
-      lastScrollTime = currentTime;
+      lastScrollTime = now;
 
       if (isLoading) return;
-
-      const dynamicThreshold = 1200 + (Math.abs(scrollVelocity) * 600);
+      const threshold = 1200 + (Math.abs(scrollVelocity) * 600);
 
       if (scrollVelocity > 0 && hasMoreForward) {
-        const distanceToBottom = document.documentElement.scrollHeight - (window.innerHeight + currentY);
-        if (distanceToBottom < dynamicThreshold) loadForward();
+        const distToBottom = document.documentElement.scrollHeight - (window.innerHeight + currentY);
+        if (distToBottom < threshold) loadForward();
       } else if (scrollVelocity < 0 && hasMoreBackward && !isAtTop) {
-        if (currentY < dynamicThreshold) loadBackward();
+        if (currentY < threshold) loadBackward();
       }
     }
 
     window.addEventListener("scroll", () => {
-      if (!scrollTicking) {
-        scrollTicking = true;
-        requestAnimationFrame(onScrollTick);
-      }
+      if (!scrollTicking) { scrollTicking = true; requestAnimationFrame(onScrollTick); }
     }, { passive: true });
 
-    // Fallback: debounced check after each load completes
     let scheduleCheckTimer = null;
     function scheduleCheck() {
       clearTimeout(scheduleCheckTimer);
       scheduleCheckTimer = setTimeout(() => {
         if (isLoading) return;
-        const distanceToBottom = document.documentElement.scrollHeight - (window.innerHeight + window.scrollY);
-        const distanceToTop = window.scrollY;
-
-        if (hasMoreForward && distanceToBottom < 1200) loadForward();
-        else if (hasMoreBackward && !isAtTop && distanceToTop < 1200) loadBackward();
+        const distBot = document.documentElement.scrollHeight - (window.innerHeight + window.scrollY);
+        if (hasMoreForward && distBot < 1200) loadForward();
+        else if (hasMoreBackward && !isAtTop && window.scrollY < 1200) loadBackward();
       }, 250);
     }
 
     // -----------------------------------------------------------------------
-    // Initial load & category filter
+    // Init
     // -----------------------------------------------------------------------
     async function initLoad() {
-      // Reset everything
       pages = [];
       grid.innerHTML = renderSkeletons();
+      topSpacerHeight = 0;
+      topSpacer.style.height = "0px";
       forwardCursor = null;
       backwardCursor = null;
       hasMoreForward = true;
@@ -838,11 +767,8 @@
       topStatus.style.display = "none";
       bottomStatus.style.display = "";
       bottomStatus.innerHTML = '<div class="scroll-spinner"></div>';
-
-      // Small delay to show skeletons
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 100));
       grid.innerHTML = "";
-
       await loadForward();
     }
 
@@ -866,9 +792,6 @@
       }
     }
 
-    // -----------------------------------------------------------------------
-    // Boot
-    // -----------------------------------------------------------------------
     initCategories();
     initLoad();
   </script>

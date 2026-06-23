@@ -204,22 +204,46 @@ The frontend implements **bidirectional infinite scroll** with DOM pruning to ke
 
 ## Post-Submission Fix: Infinite Scroll Performance
 
-After deploying, I noticed the UI starts **glitching visually when scrolling fast** through 10–15+ page loads (~2,000–3,000 products). The page would stutter, jump, and become unresponsive. I traced this to six compounding performance issues in the frontend scroll logic:
+After deploying, I noticed the UI **glitches badly when scrolling fast** through 10–15+ page loads (~2,000–3,000 products). The viewport would stutter, jump backward by thousands of pixels, and become unresponsive.
 
-### Root Causes & Fixes
+### The Root Cause: `scrollBy()` vs Browser Momentum
 
-| # | Problem | Why It Caused Glitching | Fix Applied |
-|---|---------|------------------------|-------------|
-| 1 | **200 staggered `setTimeout()` calls per page load** | Each `appendPage()` created one `setTimeout` per card (at `i * 20ms` delay) to animate opacity/transform. After 15 loads, that's **3,000 pending timers** competing for the main thread, causing frame drops and layout thrashing. | Replaced all per-card `setTimeout` animations with a single CSS `@keyframes cardFadeIn` class. The class is added on append and removed after 300ms via one `requestAnimationFrame` + `setTimeout` to free compositor layers. |
-| 2 | **Scroll handler fired on every pixel** | The `scroll` event listener ran velocity calculations and distance checks on every single scroll event (can fire 60+ times/second). During fast scrolling, this flooded the main thread with redundant work. | Throttled via `requestAnimationFrame` — the handler now sets a `scrollTicking` flag and defers actual computation to the next animation frame, guaranteeing at most 1 check per ~16ms. |
-| 3 | **`scrollBy()` called inside a loop during pruning** | `pruneTop()` removed pages one at a time in a `while` loop, calling `scrollBy()` after *each* removal. Each `scrollBy()` forces the browser to recalculate layout (a forced reflow), and doing this in a tight loop during active scrolling created a jank feedback loop: prune → scrollBy → scroll event fires → wrong velocity → more loads → more prunes. | Batch all excess page removals first, do a single DOM mutation pass, then call `scrollBy()` exactly once with the total delta. |
-| 4 | **`scheduleCheck()` re-triggered loads after only 150ms** | After each load completed, `scheduleCheck()` set a 150ms timeout to check if more loading was needed. With fast scrolling, this created a rapid-fire load loop before the UI could settle, stacking network requests and DOM mutations. | Increased debounce to 250ms and added `clearTimeout` to cancel any pending check when a new one is scheduled — prevents overlapping triggers. |
-| 5 | **No CSS containment** | Every card insertion or removal caused the browser to recalculate layout for the *entire* page, not just the grid area. With 600 cards in the DOM window, this made each mutation expensive. | Added `contain: layout style` on `.product-grid` and `contain: content` on `.product-card`. This tells the browser that changes inside the grid/cards don't affect layout outside them, allowing it to skip unnecessary recalculations. |
-| 6 | **Overly broad CSS transition** | `transition: var(--transition)` on product cards transitioned *every* CSS property. During animations and DOM churn, the browser was tracking transitions on properties that never visually changed (padding, width, etc.), wasting compositor resources. | Narrowed to only the four properties that actually animate on hover: `border-color`, `background`, `transform`, `box-shadow`. |
+The sliding window prunes old pages from the DOM to keep memory low. When a page is removed from the top, the total page height shrinks — say by 5,000px. Without compensation, all content below shifts upward and the user's viewport jumps to completely different products.
+
+The original code used `window.scrollBy(0, -5000)` to counteract this — scrolling the viewport up by the same amount the page shrank, so the user stays on the same cards. **In theory** this is seamless.
+
+**In practice**, during fast scrolling the browser has its own scroll momentum running (inertial scrolling). `scrollBy()` fights that momentum, and the two compete: the browser scrolls forward while the code scrolls backward. This creates massive backward jumps (10,000–30,000px observed) and makes the page feel broken.
+
+### The Fix: Spacer Divs Instead of `scrollBy()`
+
+Instead of removing height and programmatically compensating with `scrollBy()`, I insert a **spacer `<div>`** above the product grid. When pages are pruned from the top, their height is transferred to the spacer:
+
+```js
+// Old approach (broken during fast scroll):
+removed.cards.forEach(c => c.remove());
+window.scrollBy(0, scrollAfter - scrollBefore); // fights momentum!
+
+// New approach (spacer-based):
+removed.cards.forEach(c => c.remove());
+topSpacerHeight += removedHeight;
+topSpacer.style.height = topSpacerHeight + "px"; // total height unchanged
+```
+
+The total page height stays constant, so the browser's scroll position remains valid with **zero programmatic scroll adjustment**. When the user scrolls back up and pages are prepended, the spacer shrinks by the same amount, keeping everything balanced.
+
+### Additional Fixes Applied
+
+| Problem | Fix |
+|---------|-----|
+| 200 staggered `setTimeout()` per page (3,000+ pending timers after 15 loads) | Removed — cards no longer have per-item entrance animations |
+| Scroll handler fired on every pixel | Throttled via `requestAnimationFrame` (1 check per ~16ms) |
+| `scheduleCheck()` re-triggered after only 150ms | Debounced to 250ms with `clearTimeout` |
+| No CSS containment | Added `contain: layout style` on grid, `contain: content` on cards |
+| Overly broad `transition: var(--transition)` | Narrowed to only `border-color`, `background`, `transform`, `box-shadow` |
 
 ### Result
 
-After these fixes, the UI maintains smooth 60fps scrolling regardless of how many pages have been loaded. The DOM window still caps at 3 pages (600 items), but the rendering pipeline no longer chokes on timer accumulation, forced reflows, or unnecessary layout recalculations.
+The UI now maintains smooth scrolling regardless of how many pages have been loaded. The spacer approach is the same technique used by virtual scroll libraries like `react-window` — it's the correct way to handle DOM windowing without fighting the browser's native scroll behavior.
 
 ---
 
