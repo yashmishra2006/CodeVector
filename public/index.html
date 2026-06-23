@@ -193,6 +193,7 @@
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 16px;
       margin-bottom: 16px;
+      contain: layout style;
     }
 
     .product-card {
@@ -200,10 +201,20 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       padding: 20px;
-      transition: var(--transition);
+      transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
       cursor: default;
       position: relative;
       overflow: hidden;
+      contain: content;
+    }
+
+    /* Fade-in for newly appended cards */
+    @keyframes cardFadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .product-card.card-enter {
+      animation: cardFadeIn 0.25s ease forwards;
     }
 
     .product-card::before {
@@ -580,28 +591,30 @@
     // Append a page of items to the bottom of the grid
     function appendPage(items) {
       const fragment = document.createDocumentFragment();
-      items.forEach((product, i) => {
+      items.forEach((product) => {
         const card = createCard(product);
-        card.style.opacity = "0";
-        card.style.transform = "translateY(12px)";
+        card.classList.add("card-enter");
         fragment.appendChild(card);
-        // Stagger animation
-        setTimeout(() => {
-          card.style.transition = "opacity 0.3s ease, transform 0.3s ease";
-          card.style.opacity = "1";
-          card.style.transform = "translateY(0)";
-        }, i * 20);
       });
 
+      const cards = [...fragment.children];
       const page = {
         items,
         topCursor: makeCursor(items[0]),
         bottomCursor: makeCursor(items[items.length - 1]),
-        cards: [...fragment.children],
+        cards,
       };
 
       grid.appendChild(fragment);
       pages.push(page);
+
+      // Clean up animation class after animation ends to free compositor layers
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          cards.forEach(c => c.classList.remove("card-enter"));
+        }, 300);
+      });
+
       return page;
     }
 
@@ -633,19 +646,22 @@
 
     // Prune pages from the top (when window exceeds MAX_PAGES, scrolling down)
     function pruneTop() {
-      while (pages.length > MAX_PAGES) {
-        const removed = pages.shift();
-        const scrollBefore = document.documentElement.scrollHeight;
-        removed.cards.forEach((card) => card.remove());
-        const scrollAfter = document.documentElement.scrollHeight;
-        // Adjust scroll position so content doesn't jump
-        window.scrollBy(0, scrollAfter - scrollBefore);
+      if (pages.length <= MAX_PAGES) return;
 
-        // We now have content above that was pruned
+      // Batch-remove all excess pages in one reflow
+      const toRemove = [];
+      while (pages.length > MAX_PAGES) {
+        toRemove.push(pages.shift());
         hasMoreBackward = true;
         isAtTop = false;
       }
-      // Update backward cursor to the top edge of current window
+
+      const scrollBefore = document.documentElement.scrollHeight;
+      toRemove.forEach(p => p.cards.forEach(c => c.remove()));
+      const scrollAfter = document.documentElement.scrollHeight;
+      const delta = scrollAfter - scrollBefore;
+      if (delta !== 0) window.scrollBy(0, delta);
+
       if (pages.length > 0) {
         backwardCursor = pages[0].topCursor;
       }
@@ -754,56 +770,56 @@
     }
 
     // -----------------------------------------------------------------------
-    // Dynamic Scroll-Velocity Preloading
+    // Dynamic Scroll-Velocity Preloading (throttled to 1 check per 100ms)
     // -----------------------------------------------------------------------
     let lastScrollY = window.scrollY;
     let lastScrollTime = Date.now();
-    let scrollVelocity = 0; // pixels per millisecond
+    let scrollVelocity = 0;
+    let scrollTicking = false;
 
-    window.addEventListener("scroll", () => {
+    function onScrollTick() {
+      scrollTicking = false;
       const currentY = window.scrollY;
       const currentTime = Date.now();
       const dt = currentTime - lastScrollTime;
 
-      // Calculate instantaneous scroll velocity (px / ms)
       if (dt > 0) {
         scrollVelocity = (currentY - lastScrollY) / dt;
       }
       lastScrollY = currentY;
       lastScrollTime = currentTime;
 
-      // Base threshold is 1000px (~25 items). 
-      // We multiply velocity by an assumed 800ms network/render latency to get dynamic buffer.
-      // If scrolling down at 5px/ms (very fast), we add 4000px to the threshold.
-      const dynamicThreshold = 1000 + (Math.abs(scrollVelocity) * 800);
+      if (isLoading) return;
 
-      // Check distance to bottom for forward loading
-      if (scrollVelocity > 0 && !isLoading && hasMoreForward) {
-        const distanceToBottom = document.documentElement.scrollHeight - (window.innerHeight + window.scrollY);
-        if (distanceToBottom < dynamicThreshold) {
-          loadForward();
-        }
+      const dynamicThreshold = 1200 + (Math.abs(scrollVelocity) * 600);
+
+      if (scrollVelocity > 0 && hasMoreForward) {
+        const distanceToBottom = document.documentElement.scrollHeight - (window.innerHeight + currentY);
+        if (distanceToBottom < dynamicThreshold) loadForward();
+      } else if (scrollVelocity < 0 && hasMoreBackward && !isAtTop) {
+        if (currentY < dynamicThreshold) loadBackward();
       }
+    }
 
-      // Check distance to top for backward loading
-      if (scrollVelocity < 0 && !isLoading && hasMoreBackward && !isAtTop) {
-        const distanceToTop = window.scrollY;
-        if (distanceToTop < dynamicThreshold) {
-          loadBackward();
-        }
+    window.addEventListener("scroll", () => {
+      if (!scrollTicking) {
+        scrollTicking = true;
+        requestAnimationFrame(onScrollTick);
       }
     }, { passive: true });
 
-    // Fallback: Check occasionally in case scroll event stops firing before fetch completes
+    // Fallback: debounced check after each load completes
+    let scheduleCheckTimer = null;
     function scheduleCheck() {
-      setTimeout(() => {
+      clearTimeout(scheduleCheckTimer);
+      scheduleCheckTimer = setTimeout(() => {
         if (isLoading) return;
         const distanceToBottom = document.documentElement.scrollHeight - (window.innerHeight + window.scrollY);
         const distanceToTop = window.scrollY;
-        
-        if (hasMoreForward && distanceToBottom < 1000) loadForward();
-        else if (hasMoreBackward && !isAtTop && distanceToTop < 1000) loadBackward();
-      }, 150);
+
+        if (hasMoreForward && distanceToBottom < 1200) loadForward();
+        else if (hasMoreBackward && !isAtTop && distanceToTop < 1200) loadBackward();
+      }, 250);
     }
 
     // -----------------------------------------------------------------------

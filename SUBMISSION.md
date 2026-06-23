@@ -202,6 +202,27 @@ The frontend implements **bidirectional infinite scroll** with DOM pruning to ke
 
 ---
 
+## Post-Submission Fix: Infinite Scroll Performance
+
+After deploying, I noticed the UI starts **glitching visually when scrolling fast** through 10–15+ page loads (~2,000–3,000 products). The page would stutter, jump, and become unresponsive. I traced this to six compounding performance issues in the frontend scroll logic:
+
+### Root Causes & Fixes
+
+| # | Problem | Why It Caused Glitching | Fix Applied |
+|---|---------|------------------------|-------------|
+| 1 | **200 staggered `setTimeout()` calls per page load** | Each `appendPage()` created one `setTimeout` per card (at `i * 20ms` delay) to animate opacity/transform. After 15 loads, that's **3,000 pending timers** competing for the main thread, causing frame drops and layout thrashing. | Replaced all per-card `setTimeout` animations with a single CSS `@keyframes cardFadeIn` class. The class is added on append and removed after 300ms via one `requestAnimationFrame` + `setTimeout` to free compositor layers. |
+| 2 | **Scroll handler fired on every pixel** | The `scroll` event listener ran velocity calculations and distance checks on every single scroll event (can fire 60+ times/second). During fast scrolling, this flooded the main thread with redundant work. | Throttled via `requestAnimationFrame` — the handler now sets a `scrollTicking` flag and defers actual computation to the next animation frame, guaranteeing at most 1 check per ~16ms. |
+| 3 | **`scrollBy()` called inside a loop during pruning** | `pruneTop()` removed pages one at a time in a `while` loop, calling `scrollBy()` after *each* removal. Each `scrollBy()` forces the browser to recalculate layout (a forced reflow), and doing this in a tight loop during active scrolling created a jank feedback loop: prune → scrollBy → scroll event fires → wrong velocity → more loads → more prunes. | Batch all excess page removals first, do a single DOM mutation pass, then call `scrollBy()` exactly once with the total delta. |
+| 4 | **`scheduleCheck()` re-triggered loads after only 150ms** | After each load completed, `scheduleCheck()` set a 150ms timeout to check if more loading was needed. With fast scrolling, this created a rapid-fire load loop before the UI could settle, stacking network requests and DOM mutations. | Increased debounce to 250ms and added `clearTimeout` to cancel any pending check when a new one is scheduled — prevents overlapping triggers. |
+| 5 | **No CSS containment** | Every card insertion or removal caused the browser to recalculate layout for the *entire* page, not just the grid area. With 600 cards in the DOM window, this made each mutation expensive. | Added `contain: layout style` on `.product-grid` and `contain: content` on `.product-card`. This tells the browser that changes inside the grid/cards don't affect layout outside them, allowing it to skip unnecessary recalculations. |
+| 6 | **Overly broad CSS transition** | `transition: var(--transition)` on product cards transitioned *every* CSS property. During animations and DOM churn, the browser was tracking transitions on properties that never visually changed (padding, width, etc.), wasting compositor resources. | Narrowed to only the four properties that actually animate on hover: `border-color`, `background`, `transform`, `box-shadow`. |
+
+### Result
+
+After these fixes, the UI maintains smooth 60fps scrolling regardless of how many pages have been loaded. The DOM window still caps at 3 pages (600 items), but the rendering pipeline no longer chokes on timer accumulation, forced reflows, or unnecessary layout recalculations.
+
+---
+
 ## What I'd Improve With More Time
 
 1. **Rate limiting and input validation** - Add `express-rate-limit` to prevent abuse, validate and sanitize query parameters more rigorously.
